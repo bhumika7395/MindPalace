@@ -54,8 +54,8 @@ const Logo = ({ size = 28, color = C.accent }) => (
   </svg>
 );
 
-// ——— AI (GEMINI FREE TIER) ———
-const GEMINI_MODEL = "gemini-2.0-flash-lite";
+// ——— AI (GROQ FREE TIER) ———
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 function sysPr(mode, cards, groups, context) {
   const gl = groups.join(", ");
@@ -71,35 +71,35 @@ Cards can be empty. Add 1-3 for substantive ideas. "Pin that" = extract idea. ON
 
 async function callAI(msgs, sys, apiKey) {
   try {
-    // Convert history from Anthropic format to Gemini format
-    const contents = msgs.map(m => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
+    const messages = [
+      { role: "system", content: sys },
+      ...msgs.map(m => ({ role: m.role, content: m.content })),
+    ];
 
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: sys }] },
-          contents,
-          generationConfig: { maxOutputTokens: 1000, temperature: 0.9 },
-        }),
-      }
-    );
+    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages,
+        max_tokens: 1000,
+        temperature: 0.9,
+      }),
+    });
 
     if (!r.ok) {
       const err = await r.json().catch(() => ({}));
       const code = err?.error?.code || r.status;
-      if (code === 400 || code === 403) return { response: "Invalid API key. Check your Gemini key in settings.", cards: [] };
-      if (code === 429) return { response: "Rate limited — Gemini free tier allows 15 requests/min. Wait a moment and try again.", cards: [] };
+      if (code === 401 || code === "invalid_api_key") return { response: "Invalid API key. Check your Groq key in settings.", cards: [] };
+      if (code === 429) return { response: "Rate limited — wait a moment and try again.", cards: [] };
       return { response: `API error (${code}). Try again?`, cards: [] };
     }
 
     const d = await r.json();
-    const t = d.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
+    const t = d.choices?.[0]?.message?.content || "";
     return JSON.parse(t.replace(/```json\s?|```/g, "").trim());
   } catch (e) {
     console.error("AI call failed:", e);
@@ -111,7 +111,7 @@ async function callAI(msgs, sys, apiKey) {
 export default function MindPalace() {
   const [screen, setScreen] = useState("home");
   const [apiKey, setApiKey] = useState(() => {
-    try { return sessionStorage.getItem("mp_gemini_key") || ""; } catch { return ""; }
+    try { return sessionStorage.getItem("mp_groq_key") || ""; } catch { return ""; }
   });
   const [keyInput, setKeyInput] = useState("");
   const [keyError, setKeyError] = useState("");
@@ -154,20 +154,21 @@ export default function MindPalace() {
     if (!k) { setKeyError("Please enter an API key."); return; }
     setKeyTesting(true); setKeyError("");
     try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${k}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: 'Reply with exactly: {"status":"ok"}' }] }],
-            generationConfig: { maxOutputTokens: 50 },
-          }),
-        }
-      );
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${k}`,
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: [{ role: "user", content: 'Reply with exactly: {"status":"ok"}' }],
+          max_tokens: 50,
+        }),
+      });
       if (r.ok) {
         setApiKey(k);
-        try { sessionStorage.setItem("mp_gemini_key", k); } catch {}
+        try { sessionStorage.setItem("mp_groq_key", k); } catch {}
         setShowKeySetup(false); setKeyError(""); setKeyInput("");
       } else {
         const err = await r.json().catch(() => ({}));
@@ -179,7 +180,7 @@ export default function MindPalace() {
 
   const clearKey = () => {
     setApiKey("");
-    try { sessionStorage.removeItem("mp_gemini_key"); } catch {}
+    try { sessionStorage.removeItem("mp_groq_key"); } catch {}
   };
 
   const pushC = (ac) => {
@@ -257,7 +258,6 @@ export default function MindPalace() {
 @keyframes tp{0%,60%{opacity:1}80%{opacity:.3}100%{opacity:1}}
 @keyframes pl{0%,100%{opacity:.2}50%{opacity:.4}}
 @keyframes gl{0%,100%{box-shadow:0 0 16px rgba(180,160,255,.05)}50%{box-shadow:0 0 32px rgba(180,160,255,.1)}}
-@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 .tl-btn{width:40px;height:40px;border:none;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;background:transparent;color:${C.muted};font-size:18px}
 .tl-btn:hover{background:${C.surfHov};color:${C.soft}}
 .tl-btn.act{background:${C.text};color:${C.deep}}
@@ -268,7 +268,7 @@ export default function MindPalace() {
 .qc{transition:all .12s;cursor:pointer}.qc:hover{background:${C.accentBg}!important;color:${C.accent}!important;border-color:${C.accent}!important}
 .sticky{transition:all .18s;cursor:pointer;position:relative}.sticky:hover{transform:scale(1.03);z-index:10}
 .pin-d{width:8px;height:8px;border-radius:50%;position:absolute;top:-4px;left:50%;margin-left:-4px;z-index:2;border:1.5px solid rgba(0,0,0,.3)}
-.gemini-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:14px;font-size:10px;background:linear-gradient(135deg,#4285f420,#ea433520);border:1px solid #4285f430;color:#8ab4f8}
+.ai-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:14px;font-size:10px;background:linear-gradient(135deg,#f5520420,#ff6b3520);border:1px solid #f5520430;color:#ff8a65}
 `;
 
   // ——— API KEY SETUP MODAL ———
@@ -281,9 +281,9 @@ export default function MindPalace() {
           <h3 style={{ fontSize: 17, fontWeight: 600, color: C.text }}>Connect AI</h3>
         </div>
         <p style={{ fontSize: 13, color: C.soft, lineHeight: 1.6, marginBottom: 18 }}>
-          MindPalace uses <span className="gemini-badge">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.86-7-7.93 0-.62.08-1.22.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" fill="#8ab4f8"/></svg>
-            Gemini Flash Lite
+          MindPalace uses <span className="ai-badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M13 3L4 14h7l-2 7 9-11h-7l2-7z" fill="#ff8a65"/></svg>
+            Groq + Llama 3.3
           </span> — completely free, no credit card needed.
         </p>
 
@@ -291,9 +291,9 @@ export default function MindPalace() {
           <p style={{ fontSize: 11, fontWeight: 600, color: C.accent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Get your free key in 30 seconds</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {[
-              { n: "1", t: "Go to Google AI Studio", sub: "aistudio.google.com/apikey", link: "https://aistudio.google.com/apikey" },
-              { n: "2", t: "Sign in with your Google account" },
-              { n: "3", t: "Click \"Create API key\"" },
+              { n: "1", t: "Go to Groq Console", sub: "console.groq.com/keys", link: "https://console.groq.com/keys" },
+              { n: "2", t: "Sign up or log in (free)" },
+              { n: "3", t: 'Click "Create API Key"' },
               { n: "4", t: "Copy and paste it below" },
             ].map(s => (
               <div key={s.n} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -311,7 +311,7 @@ export default function MindPalace() {
           <input
             value={keyInput} onChange={e => { setKeyInput(e.target.value); setKeyError(""); }}
             onKeyDown={e => { if (e.key === "Enter") testAndSaveKey(keyInput); }}
-            placeholder="Paste your Gemini API key..."
+            placeholder="Paste your Groq API key (gsk_...)"
             type="password"
             style={{ flex: 1, background: C.bg, border: `1px solid ${keyError ? C.coral : C.border}`, borderRadius: 10, padding: "10px 14px", color: C.text, fontSize: 13, fontFamily: "inherit", outline: "none", transition: "border-color .15s" }}
           />
@@ -359,9 +359,9 @@ export default function MindPalace() {
             </button>
             {apiKey ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="gemini-badge">
+                <span className="ai-badge">
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.mint }} />
-                  Gemini connected
+                  Groq connected
                 </span>
                 <button onClick={clearKey}
                   style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 11, fontFamily: "inherit", textDecoration: "underline" }}>Disconnect</button>
@@ -384,12 +384,12 @@ export default function MindPalace() {
         <div style={{ animation: "fu .6s ease .15s both" }}>
           <div style={{ background: `linear-gradient(135deg, ${C.surface}, ${C.bg})`, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 24px", marginBottom: 32 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.86-7-7.93 0-.62.08-1.22.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" fill="#8ab4f8"/></svg>
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Powered by Gemini Flash Lite</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 3L4 14h7l-2 7 9-11h-7l2-7z" fill="#ff8a65"/></svg>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Powered by Groq + Llama 3.3 70B</span>
               <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 8, background: C.mint + "20", color: C.mint, fontWeight: 600 }}>FREE</span>
             </div>
             <p style={{ fontSize: 12, color: C.soft, lineHeight: 1.6 }}>
-              Get a free API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{ color: C.mint, textDecoration: "underline" }}>aistudio.google.com/apikey</a> — no credit card, no charges. Your key stays in your browser.
+              Get a free API key from <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" style={{ color: C.mint, textDecoration: "underline" }}>console.groq.com/keys</a> — no credit card, no charges. Your key stays in your browser.
             </p>
           </div>
         </div>
@@ -423,10 +423,10 @@ export default function MindPalace() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          {/* Gemini status */}
-          <span className="gemini-badge" style={{ cursor: "pointer" }} onClick={() => setShowKeySetup(true)}>
+          {/* AI status */}
+          <span className="ai-badge" style={{ cursor: "pointer" }} onClick={() => setShowKeySetup(true)}>
             <span style={{ width: 5, height: 5, borderRadius: "50%", background: apiKey ? C.mint : C.coral }} />
-            {apiKey ? "Gemini" : "No key"}
+            {apiKey ? "Groq" : "No key"}
           </span>
           {/* Mode */}
           <div style={{ position: "relative" }}>
