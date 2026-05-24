@@ -55,7 +55,7 @@ const Logo = ({ size = 28, color = C.accent }) => (
 );
 
 // ——— AI (GEMINI FREE TIER) ———
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODEL = "gemini-1.5-flash";
 
 function sysPr(mode, cards, groups, context) {
   const gl = groups.join(", ");
@@ -283,7 +283,7 @@ export default function MindPalace() {
         <p style={{ fontSize: 13, color: C.soft, lineHeight: 1.6, marginBottom: 18 }}>
           MindPalace uses <span className="gemini-badge">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.86-7-7.93 0-.62.08-1.22.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" fill="#8ab4f8"/></svg>
-            Gemini 2.0 Flash
+            Gemini 1.5 Flash
           </span> — completely free, no credit card needed.
         </p>
 
@@ -291,7 +291,7 @@ export default function MindPalace() {
           <p style={{ fontSize: 11, fontWeight: 600, color: C.accent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Get your free key in 30 seconds</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {[
-              { n: "1", t: "Go to Google AI Studio", sub: "aistudio.google.com/apikey" },
+              { n: "1", t: "Go to Google AI Studio", sub: "aistudio.google.com/apikey", link: "https://aistudio.google.com/apikey" },
               { n: "2", t: "Sign in with your Google account" },
               { n: "3", t: "Click \"Create API key\"" },
               { n: "4", t: "Copy and paste it below" },
@@ -300,7 +300,7 @@ export default function MindPalace() {
                 <span style={{ width: 20, height: 20, borderRadius: "50%", background: C.accentBg, border: `1px solid ${C.accent}40`, color: C.accent, fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{s.n}</span>
                 <div>
                   <span style={{ fontSize: 12, color: C.text }}>{s.t}</span>
-                  {s.sub && <span style={{ display: "block", fontSize: 10, color: C.mint, marginTop: 1 }}>{s.sub}</span>}
+                  {s.sub && (s.link ? <a href={s.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", fontSize: 10, color: C.mint, marginTop: 1, textDecoration: "underline" }}>{s.sub}</a> : <span style={{ display: "block", fontSize: 10, color: C.mint, marginTop: 1 }}>{s.sub}</span>)}
                 </div>
               </div>
             ))}
@@ -385,11 +385,11 @@ export default function MindPalace() {
           <div style={{ background: `linear-gradient(135deg, ${C.surface}, ${C.bg})`, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 24px", marginBottom: 32 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.86-7-7.93 0-.62.08-1.22.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" fill="#8ab4f8"/></svg>
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Powered by Gemini 2.0 Flash</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Powered by Gemini 1.5 Flash</span>
               <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 8, background: C.mint + "20", color: C.mint, fontWeight: 600 }}>FREE</span>
             </div>
             <p style={{ fontSize: 12, color: C.soft, lineHeight: 1.6 }}>
-              Get a free API key from <span style={{ color: C.mint }}>aistudio.google.com/apikey</span> — no credit card, no charges. Your key stays in your browser.
+              Get a free API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{ color: C.mint, textDecoration: "underline" }}>aistudio.google.com/apikey</a> — no credit card, no charges. Your key stays in your browser.
             </p>
           </div>
         </div>
