@@ -53,8 +53,16 @@ Cards can be empty. Add 1-3 for substantive ideas. "Pin that" = extract idea. ON
 }
 async function callAI(msgs,sys) {
   try {
-    const r = await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({system:sys,messages:msgs})});
-    const d = await r.json(); const t = d.content?.map(b=>b.text||"").join("")||"";
+    const apiKey = localStorage.getItem("groq-api-key");
+    if(!apiKey) return {response:"Please set your Groq API key in settings first.",cards:[]};
+    const r = await fetch("https://api.groq.com/openai/v1/chat/completions",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+apiKey},
+      body:JSON.stringify({model:"llama-3.3-70b-versatile",max_tokens:1000,messages:[{role:"system",content:sys},...msgs]})
+    });
+    const d = await r.json();
+    if(d.error) return {response:"API error: "+d.error.message,cards:[]};
+    const t = d.choices?.[0]?.message?.content||"";
     return JSON.parse(t.replace(/```json\s?|```/g,"").trim());
   } catch(e){ return {response:"Connection issue — try again?",cards:[]}; }
 }
@@ -90,6 +98,9 @@ async function deleteProject(id) {
 // ——— MAIN COMPONENT ———
 export default function MindPalace() {
   const [screen,setScreen]=useState("home");
+  const [apiKey,setApiKey]=useState(()=>localStorage.getItem("groq-api-key")||"");
+  const [showKeySetup,setShowKeySetup]=useState(false);
+  const [keyInput,setKeyInput]=useState("");
   const [projId,setProjId]=useState(null);
   const [projName,setProjName]=useState("Untitled Project");
   const [context,setContext]=useState("");
@@ -128,6 +139,8 @@ export default function MindPalace() {
   const saveTimer=useRef(null);
   const exchCount=useRef(0);
   const ctxDone=useRef(false);
+
+  const saveApiKey=(key)=>{localStorage.setItem("groq-api-key",key);setApiKey(key);setShowKeySetup(false);setKeyInput("");};
 
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[msgs,typing]);
   useEffect(()=>{scEndRef.current?.scrollIntoView({behavior:"smooth"});},[scMsgs,scTyping]);
@@ -208,6 +221,14 @@ export default function MindPalace() {
           <h1 style={{fontFamily:"'Instrument Serif',serif",fontSize:50,fontWeight:400,lineHeight:1.1,marginBottom:14}}>Your ideas deserve<br/><span style={{color:C.accent}}>a place to live.</span></h1>
           <p style={{fontSize:16,color:C.soft,lineHeight:1.65,maxWidth:440,marginBottom:36}}>AI-powered brainstorming on a spatial canvas. Grounded in cognitive science.</p>
           <button onClick={newProject} style={{background:C.accent,border:"none",borderRadius:12,padding:"14px 32px",color:C.deep,fontSize:15,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>New Project</button>
+          {/* API Key Status */}
+          <div style={{marginTop:20,padding:"12px 16px",background:C.surface,border:`1px solid ${apiKey?C.mint+"60":C.coral+"60"}`,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{width:8,height:8,borderRadius:"50%",background:apiKey?C.mint:C.coral}}/>
+              <span style={{fontSize:12,color:apiKey?C.mint:C.coral}}>{apiKey?"Groq AI connected":"No AI key set — chat won't work"}</span>
+            </div>
+            <button onClick={()=>{setShowKeySetup(true);setKeyInput(apiKey);}} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:6,padding:"3px 10px",color:C.soft,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>{apiKey?"Change key":"Set up"}</button>
+          </div>
         </div>
         <div style={{display:"flex",gap:7,flexWrap:"wrap",margin:"32px 0 48px",animation:"fu .6s ease .1s both"}}>
           {[{l:"Cognitive load theory",c:C.accent},{l:"Dual coding",c:C.mint},{l:"Spatial thinking",c:C.gold},{l:"KJ method",c:C.sky}].map(r=><span key={r.l} style={{fontSize:10,padding:"3px 11px",borderRadius:16,background:C.surface,border:`1px solid ${C.border}`,color:r.c}}>{r.l}</span>)}
@@ -223,6 +244,24 @@ export default function MindPalace() {
             </div>)}
           </div>}
         </div>
+        {/* API KEY SETUP MODAL */}
+        {showKeySetup&&<><div onClick={()=>setShowKeySetup(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",zIndex:150}}/><div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:420,background:C.surface,border:`1px solid ${C.border}`,borderRadius:16,padding:28,zIndex:200,boxShadow:"0 20px 60px rgba(0,0,0,.5)",animation:"pop .2s"}}>
+          <h3 style={{fontSize:16,fontWeight:600,marginBottom:4}}>Connect Groq AI</h3>
+          <p style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.5}}>MindPalace uses Groq's free AI API. Get your key in 30 seconds — no credit card needed.</p>
+          <div style={{background:C.bg,borderRadius:8,padding:"12px 14px",marginBottom:14,border:`1px solid ${C.border}`}}>
+            <p style={{fontSize:11,color:C.soft,marginBottom:8,lineHeight:1.6}}>
+              <span style={{color:C.accent,fontWeight:600}}>1.</span> Go to <a href="https://console.groq.com" target="_blank" rel="noopener" style={{color:C.accent,textDecoration:"underline"}}>console.groq.com</a> and sign up (free)<br/>
+              <span style={{color:C.accent,fontWeight:600}}>2.</span> Click "API Keys" in the sidebar<br/>
+              <span style={{color:C.accent,fontWeight:600}}>3.</span> Click "Create API Key" and copy it
+            </p>
+          </div>
+          <input value={keyInput} onChange={e=>setKeyInput(e.target.value)} placeholder="Paste your Groq API key here (starts with gsk_...)" style={{width:"100%",background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px 12px",color:C.text,fontSize:13,fontFamily:"inherit",outline:"none",marginBottom:12}}/>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setShowKeySetup(false)} style={{flex:1,background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 0",color:C.soft,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+            <button onClick={()=>{if(keyInput.trim())saveApiKey(keyInput.trim());}} disabled={!keyInput.trim()} style={{flex:1,background:C.accent,border:"none",borderRadius:10,padding:"10px 0",color:C.deep,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:keyInput.trim()?1:.4}}>Save key</button>
+          </div>
+          {apiKey&&<button onClick={()=>{localStorage.removeItem("groq-api-key");setApiKey("");setShowKeySetup(false);}} style={{width:"100%",marginTop:8,background:"none",border:"none",color:C.coral,fontSize:11,cursor:"pointer",fontFamily:"inherit",padding:4}}>Remove saved key</button>}
+        </div></>}
       </div>
     </div>
   );
@@ -361,7 +400,7 @@ export default function MindPalace() {
         {menuOpen&&<><div onClick={()=>setMenuOpen(false)} style={{position:"fixed",inset:0,zIndex:150}}/><div style={{position:"fixed",top:44,left:0,width:240,background:C.surface,border:`1px solid ${C.border}`,borderRadius:"0 12px 12px 0",padding:"6px 4px",zIndex:200,boxShadow:"0 12px 40px rgba(0,0,0,.5)",animation:"sL .15s"}}>
           <button className="mi" onClick={()=>{saveProject(projId,{projName,context,mode,groups,activeFramework,cards,conns,strokes,texts,msgs,hist}).then(()=>loadProjectList().then(setProjectList));setScreen("home");setMenuOpen(false);}}>← All projects</button>
           <button className="mi" onClick={()=>{setShareOpen(true);setMenuOpen(false);}}>↗ Share</button><button className="mi" onClick={()=>setMenuOpen(false)}>⤓ Export as PDF</button><button className="mi" onClick={()=>setMenuOpen(false)}>⧉ Duplicate</button>
-          <div className="ms"/><button className="mi" onClick={()=>{setEditCtx(true);setMenuOpen(false);}}>✎ Edit context</button><button className="mi" onClick={()=>setMenuOpen(false)}>? Help</button><div className="ms"/><button className="mi" onClick={()=>setMenuOpen(false)}>⚙ Settings</button><div className="ms"/>
+          <div className="ms"/><button className="mi" onClick={()=>{setEditCtx(true);setMenuOpen(false);}}>✎ Edit context</button><button className="mi" onClick={()=>{setShowKeySetup(true);setKeyInput(apiKey);setMenuOpen(false);}}>🔑 API Key {apiKey?"✓":""}</button><button className="mi" onClick={()=>setMenuOpen(false)}>? Help</button><div className="ms"/><button className="mi" onClick={()=>setMenuOpen(false)}>⚙ Settings</button><div className="ms"/>
           <button className="mi" onClick={()=>{delProject(projId);setScreen("home");setMenuOpen(false);loadProjectList().then(setProjectList);}} style={{color:C.coral}}>✗ Delete project</button>
         </div></>}
 
@@ -371,6 +410,24 @@ export default function MindPalace() {
           <div style={{display:"flex",gap:8,marginBottom:16}}><input placeholder="Enter email to invite..." style={{flex:1,background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"8px 12px",color:C.text,fontSize:13,fontFamily:"inherit",outline:"none"}}/><button style={{background:C.accent,border:"none",borderRadius:8,padding:"0 16px",color:C.deep,fontWeight:500,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Invite</button></div>
           <div style={{background:C.bg,borderRadius:8,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",border:`1px solid ${C.border}`}}><span style={{fontSize:12,color:C.soft}}>mindpalace.app/b/xk7f2...</span><button style={{background:C.accentBg,border:`1px solid ${C.accent}40`,borderRadius:6,padding:"4px 12px",color:C.accent,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>Copy link</button></div>
           <p style={{fontSize:11,color:C.dim,marginTop:10}}>Anyone with the link can view. Invite for edit access.</p>
+        </div></>}
+
+        {/* API KEY SETUP MODAL (canvas) */}
+        {showKeySetup&&<><div onClick={()=>setShowKeySetup(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",zIndex:250}}/><div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:420,background:C.surface,border:`1px solid ${C.border}`,borderRadius:16,padding:28,zIndex:260,boxShadow:"0 20px 60px rgba(0,0,0,.5)",animation:"pop .2s"}}>
+          <h3 style={{fontSize:16,fontWeight:600,marginBottom:4}}>Connect Groq AI</h3>
+          <p style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.5}}>Free AI API — no credit card needed.</p>
+          <div style={{background:C.bg,borderRadius:8,padding:"12px 14px",marginBottom:14,border:`1px solid ${C.border}`}}>
+            <p style={{fontSize:11,color:C.soft,marginBottom:8,lineHeight:1.6}}>
+              <span style={{color:C.accent,fontWeight:600}}>1.</span> Go to <a href="https://console.groq.com" target="_blank" rel="noopener" style={{color:C.accent,textDecoration:"underline"}}>console.groq.com</a> and sign up<br/>
+              <span style={{color:C.accent,fontWeight:600}}>2.</span> Click "API Keys" in the sidebar<br/>
+              <span style={{color:C.accent,fontWeight:600}}>3.</span> Create and copy your key
+            </p>
+          </div>
+          <input value={keyInput} onChange={e=>setKeyInput(e.target.value)} placeholder="Paste key here (starts with gsk_...)" style={{width:"100%",background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px 12px",color:C.text,fontSize:13,fontFamily:"inherit",outline:"none",marginBottom:12}}/>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setShowKeySetup(false)} style={{flex:1,background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 0",color:C.soft,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+            <button onClick={()=>{if(keyInput.trim())saveApiKey(keyInput.trim());}} disabled={!keyInput.trim()} style={{flex:1,background:C.accent,border:"none",borderRadius:10,padding:"10px 0",color:C.deep,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:keyInput.trim()?1:.4}}>Save key</button>
+          </div>
         </div></>}
       </div>
     </div>
